@@ -18,7 +18,7 @@ Given a directory of Danish AIS CSV files, the tool outputs the following files 
 ## Docker Hub image
 
 ```
-kruel1/bigdata-task3:1.0
+kruel1/bigdata_task_final:1.0
 ```
 
 The image is built and pushed automatically via GitHub Actions on every push to `main`. The `latest` tag always tracks the most recent successful build.
@@ -35,7 +35,7 @@ The script writes CSVs into `./data/`. The full month is large; for development,
 ## 2 — Build the image (local; optional — CI does this for you)
 
 ```bash
-docker build -t kruel1/bigdata-task3:1.0 .
+docker build -t kruel1/bigdata_task_final:1.0 .
 ```
 
 ## 3 — Run the container
@@ -44,7 +44,7 @@ docker build -t kruel1/bigdata-task3:1.0 .
 docker run --rm \
     -v ${PWD}/data:/data:ro \
     -v ${PWD}/output:/app/output \
-    kruel1/bigdata-task3:1.0
+    kruel1/bigdata_task_final:1.0
 ```
 
 This mounts the AIS CSVs (read-only) and writes the result files to a local `output/` directory.
@@ -82,7 +82,7 @@ To enable the CI workflow at `.github/workflows/docker-build.yml`:
 2. In your GitHub repo: Settings → Secrets and variables → Actions → New repository secret. Add:
    - `DOCKERHUB_USERNAME` — your Docker Hub username (`kruel1`)
    - `DOCKERHUB_TOKEN` — the access token from step 1
-3. Push to `main`. The Actions tab will show the build; the image will appear at `kruel1/bigdata-task3:latest`.
+3. Push to `main`. The Actions tab will show the build; the image will appear at `kruel1/bigdata_task_final:latest`.
 
 ## Methodology — summary
 
