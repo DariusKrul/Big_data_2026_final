@@ -1,0 +1,12 @@
+services:
+  collision-detector:
+    build: .
+    image: kruel1/bigdata-task3:1.0
+    container_name: bigdata-task3
+    volumes:
+      - ./data:/data:ro
+      - ./output:/app/output
+    # Increase memory if running the full month — Spark defaults are stingy
+    environment:
+      - SPARK_DRIVER_MEMORY=4g
+    command: ["--input", "/data", "--output", "/app/output"]
