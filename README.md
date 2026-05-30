@@ -1,4 +1,4 @@
-# bigdata-task3-krul
+# big_data_2026_final
 
 PySpark utility that detects the closest vessel encounter (collision) in Danish AIS data for December 2021 within 50 nm of (55.225°N, 14.245°E), and renders the trajectories of both vessels in a ±10-minute window around the event.
 
