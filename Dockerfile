@@ -7,7 +7,7 @@ LABEL maintainer="kruel1" \
 # Java is required for PySpark. procps gives us `ps` which Spark uses to manage workers.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        openjdk-21-jre-headless \
+        default-jre-headless \
         procps && \
     rm -rf /var/lib/apt/lists/*
 
