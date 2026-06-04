@@ -358,11 +358,14 @@ def main():
     os.makedirs(args.output, exist_ok=True)
 
     spark = (
-        SparkSession.builder
-            .appName("VesselCollisionDetection")
-            .config("spark.sql.session.timeZone", "UTC")
-            .config("spark.sql.shuffle.partitions", "200")
-            .getOrCreate()
+    SparkSession.builder
+        .appName("VesselCollisionDetection")
+        .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.shuffle.partitions", "400")
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+        .config("spark.driver.maxResultSize", "2g")
+        .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
 
