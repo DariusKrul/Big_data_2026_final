@@ -1,0 +1,9 @@
+=== Vessel Collision Detection — Result ===
+Vessel A: KARIN HOEJ (MMSI 219021240)
+Vessel B: MV SCOT CARRIER (MMSI 232018267)
+Collision time (UTC): 2021-12-13 02:27:43.500000
+Position A: (55.223067, 14.243730)
+Position B: (55.223092, 14.243683)
+Minimum distance: 4.1 m
+Close-approach duration: 3 minutes
+Map: /app/output/collision_map.html

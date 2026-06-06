@@ -4,7 +4,7 @@ services:
     image: kruel1/bigdata_task_final:1.0
     container_name: bigdata_task_final
     volumes:
-      - ./data:/data:ro
+      - D:/BIG-DATA-2026:/data:ro
       - ./output:/app/output
     # Increase memory if running the full month — Spark defaults are stingy
     environment:

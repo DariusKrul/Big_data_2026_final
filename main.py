@@ -31,6 +31,15 @@ CENTER_LON = 14.245
 RADIUS_NM = 50
 RADIUS_KM = RADIUS_NM * 1.852
 EARTH_RADIUS_KM = 6371.0088
+MAX_ENCOUNTER_MINUTES = 30        # collisions are brief; longer = vessels docked together
+MIN_MEAN_SOG_PAIR_KNOTS = 2.0     # both vessels must have been moving during the encounter
+
+VALID_MMSI_MIN = 200000000   # Ship station MMSIs use leading country MID (201-775)
+VALID_MMSI_MAX = 799999999
+# Replace EXCLUDED_MOBILE_TYPES with an ALLOWED set, and flip the filter
+ALLOWED_MOBILE_TYPES = {"Class A"}
+#EXCLUDED_SHIP_TYPES = {"Pilot Vessel", "Tug", "Search and Rescue vessel",
+                      # "Anti-pollution equipment", "Port Tender", "Dredging or underwater ops"}
 
 # Rough bounding box around the center — 1 degree latitude ≈ 111 km,
 # 1 degree longitude at this latitude ≈ 63 km. 50 nm ≈ 93 km so we pad to ~1°.
@@ -123,6 +132,7 @@ def load_and_filter(spark, input_path):
         .filter(F.col("mmsi").isNotNull())
         .filter(F.col("lat").between(BBOX_LAT_MIN, BBOX_LAT_MAX))
         .filter(F.col("lon").between(BBOX_LON_MIN, BBOX_LON_MAX))
+        .filter(F.col("mmsi").between(VALID_MMSI_MIN, VALID_MMSI_MAX))
         # December 2021 only
         .filter(F.col("ts") >= F.lit("2021-12-01 00:00:00").cast("timestamp"))
         .filter(F.col("ts") < F.lit("2022-01-01 00:00:00").cast("timestamp"))
@@ -144,14 +154,23 @@ def refine_to_radius(df):
 def filter_moving_vessels(df):
     """Exclude base stations, stationary vessels, and clearly non-moving rows."""
     return (
-        df.filter(~F.col("mobile_type").isin(*EXCLUDED_MOBILE_TYPES))
+        df.filter(F.col("mobile_type").isin(*ALLOWED_MOBILE_TYPES))
           .filter(
               F.col("nav_status").isNull()
               | ~F.col("nav_status").isin(*STATIONARY_STATUSES)
           )
           .filter(F.col("sog").isNotNull() & (F.col("sog") >= MIN_SOG_KNOTS))
+          .filter(
+              F.col("ship_type").isNull()
+              | ~F.lower(F.col("ship_type")).rlike(
+                  "pilot|tug|search and rescue|dredg|tender|anti-pollution|law enforcement"
+              )
+          )
+          .filter(
+              F.col("name").isNull()
+              | ~F.upper(F.col("name")).rlike("PILOT|TUG|RESCUE|KBV |SAR ")
+          )
     )
-
 
 def drop_gps_jumps(df):
     """Drop rows whose implied speed from the previous point exceeds physical plausibility."""
@@ -237,10 +256,18 @@ def find_candidate_pairs(df):
 
 
 def select_collision_pair(close_pairs):
-    """Pick the (mmsi_a, mmsi_b) with the smallest minimum distance and confirm persistence."""
+    """Pick the (mmsi_a, mmsi_b) with the smallest minimum distance, requiring:
+       - close encounter persists >= MIN_CONSECUTIVE_MINUTES (anti-glitch)
+       - close encounter is brief (<= MAX_ENCOUNTER_MINUTES; long = docked vessels)
+       - both vessels actually moving during the encounter
+    """
     per_minute = (
         close_pairs.groupBy("mmsi_a", "mmsi_b", "t_min")
-                   .agg(F.min("dist_m").alias("min_dist_m"))
+                   .agg(
+                       F.min("dist_m").alias("min_dist_m"),
+                       F.avg("sog_a").alias("mean_sog_a"),
+                       F.avg("sog_b").alias("mean_sog_b"),
+                   )
     )
 
     summary = (
@@ -248,8 +275,13 @@ def select_collision_pair(close_pairs):
                   .agg(
                       F.min("min_dist_m").alias("min_dist_m"),
                       F.count("*").alias("close_minutes"),
+                      F.avg("mean_sog_a").alias("mean_sog_a"),
+                      F.avg("mean_sog_b").alias("mean_sog_b"),
                   )
                   .filter(F.col("close_minutes") >= MIN_CONSECUTIVE_MINUTES)
+                  .filter(F.col("close_minutes") <= MAX_ENCOUNTER_MINUTES)
+                  .filter(F.col("mean_sog_a") >= MIN_MEAN_SOG_PAIR_KNOTS)
+                  .filter(F.col("mean_sog_b") >= MIN_MEAN_SOG_PAIR_KNOTS)
                   .orderBy("min_dist_m")
     )
 
@@ -262,6 +294,8 @@ def select_collision_pair(close_pairs):
         "mmsi_b": row["mmsi_b"],
         "min_dist_m": row["min_dist_m"],
         "close_minutes": row["close_minutes"],
+        "mean_sog_a": row["mean_sog_a"],
+        "mean_sog_b": row["mean_sog_b"],
     }
 
 
@@ -358,7 +392,7 @@ def main():
     os.makedirs(args.output, exist_ok=True)
 
     spark = (
-    SparkSession.builder
+        SparkSession.builder
         .appName("VesselCollisionDetection")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.shuffle.partitions", "400")
